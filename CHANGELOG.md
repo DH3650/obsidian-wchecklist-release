@@ -1,8 +1,36 @@
 # 更新日志
 
-从 v0.1.0 开始按版本记录变更，使用“特性新增”“问题修正”“优化”等分类。尚未发布的变更后续记入 `Unreleased`，发布时归入对应版本。
+从 v0.1.0 开始按版本记录变更，使用“特性新增”“问题修正”“优化”等分类，每个版本发布时归入对应条目，不保留未发布占位段。
 
-## [Unreleased]
+## [0.1.4] - 2026-10-28
+
+### 特性新增
+
+- 项目里程碑：新增 `milestone-list` 清单类型（项目必填），支持 checkbox、📅 与 Heading 形式的里程碑定义，以及任务首行 `🎯 名称` 与裸 `🎯` 字段；引用按 `(scope, project, name)` 跨文件解析，重名、重复清单、缺少项目与未定义引用分别给出诊断。
+- 里程碑交互：Item 菜单可选当前项目的里程碑，任务行显示 resolved/empty/unresolved/ambiguous/blocked Chip；失效引用以无阻断 warning 保留，不影响其他字段编辑。
+- 里程碑管理对话框：创建清单，新增、改名、移动、完成与删除里程碑和 Heading，提供树形与扁平视图；跨文件改名先提交定义再逐任务重定位写回，部分失败返回已完成数、剩余路径与备份。
+- 工作台新增里程碑筛选与分组，并新增 `next-milestone` Dashboard，只展示未完成且带 📅 的最早里程碑。
+- 诊断构建与索引时间日志：新增 `pnpm build:diagnostics` 与 `pnpm plugin:install:prod:diagnostics`；新增「清空索引时间日志」「导出索引时间日志 (JSON)」与「切换索引时间日志的控制台输出」命令，报告写入 `WChecklist-data/reports/index-timing-*.json`，仅含阶段、耗时、计数与会话内文件代号。
+- 新增 `pnpm test:index-performance`、`pnpm test:attribute-performance` 性能基准，以及 `pnpm vault:milestones` 虚构里程碑测试 Vault 准备脚本。
+
+### 问题修正
+
+- 跨文件批量改名原按任务逐个写回、对同一文件反复全量解析；现改为每文件一次计划、一次 Guard、一次写回，避免 O(N²)，部分失败仍按文件报告并保留备份。
+- 属性修改期间同版本延迟事件仍触发一次无效界面刷新，现对 ignored 事件跳过通知，失败与后续修改照常通知。
+- 里程碑文件的 checkbox 不再被投影为普通 Task/Note，Heading 与普通列表项中的 `🎯` 保持原文。
+
+### 优化
+
+- 属性修改（set-field / repair-field / update-item）在同一操作内复用预览解析结果，整文件解析由 4 次降为 2 次，并保留写后独立读回与索引发布校验。
+- 索引解析改用内嵌 Worker，线程不可用时自动回退同步解析；诊断构建记录 `parser.worker-start/result/fallback`，宿主支持时记录 `host.long-task`。
+- 普通构建默认剔除诊断记录器、Console 标记、诊断命令与事件订阅（`__WCHECKLIST_DIAGNOSTICS__` 为 false），问题定位改用诊断构建后重装。
+- 生产同步按 Git 元数据识别主仓库规范目录名校验插件 ID，可直接从 linked worktree 执行，不会装入第二份插件。
+- 800 任务 / 50 里程碑虚构样本的索引、Chip 投影、`next-milestone` 查询与批量改名基准通过，未发现平方级写回或投影瓶颈。
+
+### 使用限制
+
+- 里程碑 M2–M4 的宿主验收（三模式 Chip、Item 菜单、未保存缓冲区与多面板、管理对话框、跨文件引用处置、Dashboard）尚未回填，结论以测试 Vault 实测为准。
+- 基准计时来自 Node 虚构样本，不含 DOM、编辑器绘制与真实磁盘 I/O，不代表生产输入时延。
 
 ## [0.1.3] - 2026-10-27
 

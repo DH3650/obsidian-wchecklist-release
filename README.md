@@ -112,12 +112,23 @@ pnpm plugin:sync         # 仅同步现有产物，不重新构建
 在 `.user/dev_config.json` 的 `obsidianPluginsDirs_ProductiveEnv` 中填写生产 Vault 的插件根目录列表（字符串数组，示例见 `config/dev_config.example.json`）。
 
 ```bash
-pnpm plugin:install:prod          # 构建成功后同步到全部生产插件目录
+pnpm plugin:install:prod          # 普通构建后同步，默认不包含诊断日志
+pnpm plugin:install:prod:diagnostics # 显式诊断构建后同步，供临时排查
 pnpm plugin:sync:prod --dry-run   # 检查现有产物与全部目标，仅预览，不写入
 pnpm plugin:sync:prod             # 仅同步现有产物
 ```
 
-生产命令只使用该列表，不回退到测试目录；写入前检查全部产物和目标类型。仅覆盖各目录下 `obsidian-wchecklist/` 内的 `main.js`、`manifest.json`、`styles.css`，保留 `data.json`、其他插件文件及笔记。生产副本的 manifest 与仓库产物保持一致（本地源码版本为 `0.0.0`，不会自动注入 Release tag）；要求插件 ID 与仓库目录名一致。更新后禁用并重新启用插件，或重启 Obsidian。同步多个目标时，实际磁盘写入失败可能造成部分目录已更新，排除故障后可重跑。
+生产命令只使用该列表，不回退到测试目录；写入前检查全部产物和目标类型。仅覆盖各目录下 `obsidian-wchecklist/` 内的 `main.js`、`manifest.json`、`styles.css`，保留 `data.json`、其他插件文件及笔记。生产副本的 manifest 与仓库产物保持一致（本地源码版本为 `0.0.0`，不会自动注入 Release tag）；要求插件 ID 与仓库目录名一致。Git linked worktree 使用 Git 元数据指向的主仓库目录名校验插件 ID，可直接从功能分支运行生产同步，不会使用 worktree 的临时目录名安装第二份插件；配置仍读取当前 worktree 的 `.user/dev_config.json`。更新后禁用并重新启用插件，或重启 Obsidian。同步多个目标时，实际磁盘写入失败可能造成部分目录已更新，排除故障后可重跑。
+
+索引性能排查：先用 `pnpm plugin:install:prod:diagnostics` 安装并重载，再执行命令「WChecklist: 清空索引时间日志」，修改任务后执行「WChecklist: 导出索引时间日志 (JSON)」。报告保存在 `WChecklist-data/reports/index-timing-*.json`，schema 2，包含最近 300 条索引、300 条同步刷新和 600 条分阶段记录；只记录阶段、耗时、计数与会话内文件代号，不记录笔记正文、路径、属性值或异常消息，不自动上传。日志不等同于真实输入延迟。
+
+诊断构建默认输出 `[WChecklist:index]` / `[WChecklist:refresh]` / `[WChecklist:phase]`，包含 UTC 时间、耗时、阶段编号和 `diagnostic-<源码指纹>`。覆盖命令与写入保护、备份、索引解析/投影、工作台、Chip 延后绘制和切换 Markdown 的事件。命令「切换索引时间日志的控制台输出」可关闭实时输出而保留内存 JSON；重载后恢复开启。嵌套阶段不能直接相加，Console 本身可能影响测量。详细步骤见[索引计时宿主清单](doc/development/issue-3-index-timing-host-checklist.md)。
+
+索引解析使用内嵌的本地 Worker，降低重新索引期间对主线程的占用；线程不可用时自动使用同步解析。诊断版以 `parser.worker-start/result/fallback` 标明运行情况，并在宿主支持时记录 `host.long-task`。长任务涵盖整个宿主，不能直接归因于插件；`index.parse` 包含线程等待和消息传输，不能视为主线程阻塞时间。命令预览、安全保护和界面更新仍在主线程。
+
+编译标记 `__WCHECKLIST_DIAGNOSTICS__` 默认 false，仅 `pnpm build:diagnostics`（`--diagnostics`）设为 true。普通构建会剔除诊断记录器、Console 标记、诊断命令和事件订阅，不创建日志缓存。问题解决后运行普通 `pnpm plugin:install:prod` 并重载即可。该方式针对[官方检查清单](https://docs.obsidian.md/oo/plugin)中移除非必要生产测试日志的要求；不代表插件其余部分已完成官方审核。watch 模式的构建指纹取启动时源码，正式回传诊断前请使用单次诊断构建。
+
+命令级属性修改基准可运行 `pnpm test:attribute-performance`，覆盖 100/400/800 Task 的完整预览、保护写入和最终索引发布，输出首轮及暖轮计时，并限制普通属性修改的整文件解析次数为 2。数据均为虚构，结果与完整重建比对；宿主磁盘、DOM 和真实输入延迟需另行实测。
 
 ### 私有 fixture（真实清单回归）
 
