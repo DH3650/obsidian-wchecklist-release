@@ -2,163 +2,222 @@
 
 <img src="assets/icons/brand.svg" alt="WChecklist" width="64" height="64">
 
-一个开发中的 Obsidian 插件：通过文件 Properties 筛选笔记，在聚合页面查看和编辑 Markdown 任务；目标方案包含 emoji / 行内属性、输入辅助菜单，以及 Microsoft Calendar 排期和提醒的双向同步。
+**把散落在笔记中的任务，汇总到一个可以直接操作的工作台。**
 
-- 插件显示名：`WChecklist`，Manifest ID：`obsidian-wchecklist`（与仓库目录名一致）
-- 设计规范：[`doc/design/product_preliminary_design.md`](doc/design/product_preliminary_design.md)（V0.5，§28 为当前规范；仅支持 v2，旧注释方案已废弃）
-- 开发计划：[`doc/design/development_plan.md`](doc/design/development_plan.md)
-- 详细实施计划：[`doc/design/detailed_development_plan.md`](doc/design/detailed_development_plan.md)（任务分解、模块契约、恢复方案与验收追踪）
-- 当前进展：G5/G6/G7 已通过，I12 收口、离线 A+B MVP 已完成。工作台、菜单/详情、单文件注册、Chip/Emoji、性能与恢复工具、品牌及使用说明已交付；日历业务仍待 G8 与 I13–I16，详见 [MVP 状态](doc/development/mvp-status.md)。
-- 使用与恢复：见 [离线版指南](doc/offline-user-guide.md)，包括安装升级、注册、Chip 设置、完整备份、重建、重装、卸载及已知限制。roadmap 扩展暂不纳入当前 MVP。
-- 品牌素材：[稳定资源与 favicon 说明](assets/icons/README.md)，沿用用户原稿；当前没有独立网页，不声称网页 favicon 已启用。
-- 离线验收：[G7 通过记录与限制](doc/development/I12-G7-review.md)。确认不代表已发布或所有平台均已实测。
-- 版本变更：[CHANGELOG.md](CHANGELOG.md)，从 v0.1.0 起按特性新增、问题修正和优化等分类记录。
+WChecklist 是一个 Obsidian 任务管理插件。你可以继续在 Markdown 笔记中记录任务，再按项目、负责人或状态集中查看、编辑和跟进。工作台中的修改会写回原笔记，任务与相关说明、链接和子任务保留在一起。
 
-## 安装（公开 Beta）
+只需注册你想管理的笔记，其余普通笔记不会自动纳入。
 
-插件处于公开测试阶段，通过 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 安装：
+**当前为公开 Beta，提供桌面端操作与移动端工作台浏览、详情轻量修改。** 已完成 Windows 宿主与移动模拟验证，Android/iOS 真机验收仍待完成。日历排期、提醒和 Outlook 双向同步尚未实现；里程碑功能已加入，但部分真实宿主验收尚未完成。
 
-1. 在 Obsidian 社区插件市场安装并启用 BRAT；
-2. 在 BRAT 设置中选择「Add Beta plugin」，填入 `https://github.com/DH3650/obsidian-wchecklist-release`；
-3. 在 Obsidian 社区插件列表中启用 WChecklist，后续更新由 BRAT 提示。
+[安装](#安装) · [快速上手](#快速上手) · [日常使用](#日常使用) · [常见问题](#常见问题) · [更新日志](CHANGELOG.md) · [反馈问题](https://github.com/DH3650/obsidian-wchecklist-release/issues)
 
-公开仓库的 Release 均为 Pre-release，附件仅含运行所需的 `main.js`、`manifest.json`、`styles.css`。当前为桌面离线版，主要在 Windows 实测，其他平台与 Obsidian 历史版本未逐一验证。
+## 它能帮你做什么
 
-## 设计原则（摘要）
-
-- **按字段保存唯一事实**：Markdown 保存可读任务语义；Vault 内独立数据文件保存详细排期、提醒和同步记录。完整备份需要两者，索引可重建；单篇 Markdown 复制不含全部日历关联。
-- **显式注册**：仅带合法 `wchecklist-type` / `wchecklist-scope` 的文件纳入管理；绝不自动纳管普通笔记。
-- **无损编辑**：所有写回基于精确 source span 的最小补丁；有歧义宁可拒绝，不重排用户原文。
-- **日历双向、显式、可恢复**：仅同步显式选择的任务及已关联事件的排期/提醒；单执行实例、字段基线与冲突检查，失败可核对恢复。该能力尚未实现。
-
-## 技术栈
-
-| 层 | 选型 |
+| 你的使用场景 | WChecklist 的操作方式 |
 | --- | --- |
-| 宿主 | Obsidian Plugin API（桌面端优先） |
-| 语言 | TypeScript（strict） |
-| 包管理 | pnpm（packageManager 固定为 12.11.2） |
-| 构建 | esbuild → 单文件 `main.js` |
-| 测试 | vitest（纯 Node 跑 `src/core/`，不依赖 Obsidian） |
-| Markdown 解析 | remark / mdast + 原文 span/BOM 适配（G1 已确认；正式边界在 I02/I03 验证） |
-| YAML | yaml 2.9.1，用于受测注册字段的校验与 token 定位；不整体 dump。任务/节点字段适配在 I03/I05 单独验证，日期保持字符串 |
-| 编辑器渲染 | CodeMirror 6 Decorations（Live Preview）+ 阅读模式后处理 |
-| 日历同步 | 计划使用 Microsoft Graph；当前未接入，授权与提供方能力留 G8 验证 |
-| 凭据存储 | 尚未实现，安全存储方案留 S4/G8 验证；不将 token 写入 Vault |
-| 任务 ID | Obsidian Block ID；当前宿主按需生成 UUID，保留既有合法 ID |
-| Lint | eslint + 自定义规则：`src/core/` 禁止 import `obsidian` |
+| 任务分散在多个项目笔记里 | 在「项目」工作台汇总查看，按项目、负责人、状态筛选，也可以搜索任务 |
+| 想保留任务的上下文 | 查看原文层级和子任务，点击「打开原文」回到对应位置 |
+| 有些事情已经交给别人处理 | 标记为「已委派等待」，设置负责人和跟进日期，在「等待」页集中跟进 |
+| 临时想到一件事，暂时不想分类 | 在「收集箱」快速新增任务，之后再补充属性或移动到项目清单 |
+| 不想记住每种属性的写法 | 用快捷菜单或详情面板设置优先级、日期、负责人和类别 |
+| 任务行的属性标记太多 | 桌面端可用 Chip 属性标签显示并点击编辑；移动端阅读保留原始 Emoji |
 
-## 目录结构（规划）
+## 安装
+
+### 通过 BRAT 安装（推荐）
+
+1. 在 Obsidian 的「设置 → 社区插件」中安装并启用 [BRAT](https://github.com/TfTHacker/obsidian42-brat)。
+2. 打开 BRAT 设置，选择 **Add Beta plugin**，填入公开发布仓库地址：
+
+   ```text
+   https://github.com/DH3650/obsidian-wchecklist-release
+   ```
+
+3. 安装后，在 Obsidian 社区插件列表中启用 **WChecklist**。
+
+后续更新可通过 BRAT 检查和安装。版本变化见 [更新日志](CHANGELOG.md)。
+
+### 手动安装
+
+从[公开发布页](https://github.com/DH3650/obsidian-wchecklist-release/releases)下载同一版本的 `main.js`、`manifest.json` 和 `styles.css`，放入以下目录，再在 Obsidian 社区插件设置中启用 WChecklist：
 
 ```text
-src/
-  core/                  # 纯 TypeScript，零 Obsidian 依赖，可在 Node 下全量测试
-    model/               # Task / Note / WorkflowNode / ChecklistFile / Schedule
-    markdown/            # lexer / outline-parser / metadata-parser / semantics
-    registry/            # ChecklistFileRegistry
-    index/               # TaskIndex
-    diagnostics/
-  adapters/
-    obsidian/            # Vault / Editor / MetadataCache / SecretStorage 适配
-  __tests__/
-    fixtures/            # 脱敏回归样例（真实清单不入库，见下文）
-doc/
-  design/                # 设计规范与开发计划
+<你的 Vault>/.obsidian/plugins/obsidian-wchecklist/
 ```
 
-## 开发环境
+插件文件夹名称须保持为 `obsidian-wchecklist`。当前发布为 Pre-release，附件为上述三个文件。
 
-```bash
-pnpm --version           # 12.11.2；本机 Node 26.4.0，CI 使用 Node 22
-pnpm install --frozen-lockfile
-pnpm typecheck
-pnpm lint
-pnpm test                # 非 watch 的公开回归；不读取本地私有配置
-pnpm fixtures:check      # 校验公开样例的字节哈希、换行和词法计数
-pnpm build               # main.js / main.js.map
-pnpm dev                 # esbuild watch
-pnpm test:private        # I00 仅检查私有文件可读性；T59 语义回归在 I03 引入
-pnpm vault:prepare       # 构建后执行，准备 .user/test-vault 独立 Vault
-pnpm spike:source        # I01/S1：仅公开用例的只读源位置报告
-pnpm spike:host:prepare  # I01/S2-S3：仅向 .user/test-vault 部署专用测试插件及虚构样例
-pnpm spike:frontmatter   # I01/S3：公开虚构用例的字段补丁、无损及拒写报告
-pnpm inspect:source      # I02：公开用例的注册状态、源树/span/诊断；不读私有配置
-pnpm poc:parse           # I03：公开用例的语义/继承/诊断与 POC-01 报告；默认迁移预览
-pnpm bench:index         # I04：500 Task 单文件/十项目初测、事件回放和重建一致性报告
-pnpm bench:chips         # I12：500 Task/1000 Chip 三组虚构性能基线
-pnpm vault:performance   # 固定测试 Vault 的虚构性能样例，只补缺失
-pnpm verify:recovery     # I12：OS 临时目录里的离线重装/重建/记录保留演练
+## 快速上手
+
+### 1. 写下你的第一份清单
+
+新建一篇 Markdown 笔记，例如「网站改版」，写入：
+
+```markdown
+# 网站改版
+
+- [ ] 整理首页需求
+	- [ ] 收集参考页面
+	- [ ] 确认导航结构
+- [ ] 准备评审材料 📅 2026-11-06
+- [>] 等待设计稿 🙋 小林 📞 2026-11-03
+- [n] 评审时需要展示移动端效果
 ```
 
-若使用 Corepack，可由其读取 `packageManager`；没有 Corepack 时直接安装指定版本 pnpm。依赖精确版本及传递依赖记录在 `package.json` / `pnpm-lock.yaml`。`pnpm-workspace.yaml` 仅允许 esbuild 的安装脚本。
+子任务每层使用一个实际 Tab 缩进。日期和负责人是可选属性，只有 `- [ ] 任务内容` 也可以开始使用。`[n]` 表示说明条目（Note），不会计入未完成任务数。
 
-独立 Vault：在 Obsidian 中打开 `.user/test-vault`，允许社区插件并启用 WChecklist，检查开发者控制台，然后禁用、重新启用及重启。准备脚本只部署三个插件文件，不自动启用插件或覆盖现有笔记。实际观察须填入 I00 记录，构建成功不等于宿主验收通过。每次重新构建后重跑准备脚本。
+### 2. 把这篇笔记加入 WChecklist
 
-### 自动安装到指定 Vault
+保持笔记打开，从 Obsidian 命令面板运行 **WChecklist: 注册此文件到 WChecklist**：
 
-在 `.user/dev_config.json` 中增加 `obsidianPluginsDir`，填写 Obsidian 插件根目录，例如 `C:/MyVault/.obsidian/plugins`。保留已有 `fixtures` 字段；完整格式见 `config/dev_config.example.json`。Windows 路径可使用 `/`，使用 `\` 时须按 JSON 写成 `\\`。
+1. 选择领域：**工作**或**个人**。
+2. 选择清单类型：本例选择**项目清单**。
+3. 填写项目名称：例如「网站改版」。
+4. 点击「预览注册」，检查后点击「确认注册此文件」。
 
-```bash
-pnpm plugin:install      # 构建成功后同步到配置的插件根目录
-pnpm plugin:sync         # 仅同步现有产物，不重新构建
-```
+注册会在当前笔记的 Properties 中保存清单信息，保留正文和已有标签；取消预览不会写入。每篇需要聚合的笔记都需单独注册。
 
-工具按仓库文件夹名称创建子目录（本仓库为 `obsidian-wchecklist`），只覆盖 `main.js`、`manifest.json`、`styles.css`，保留 `data.json` 及其他本地文件。绝对路径直接使用，相对路径以仓库根目录解析。配置错误、缺少产物时返回非零退出码，开始写入前会检查全部产物；文件系统写入失败时可能存在部分更新，修复权限后可重新同步。
+### 3. 打开工作台，查看和修改任务
 
-为了符合 [Obsidian 对目录名和插件 ID 一致的要求](https://docs.obsidian.md/Reference/Manifest)，源码 manifest ID 与仓库目录名一致，均为 `obsidian-wchecklist`；安装工具仍会按目标仓库目录名对齐安装副本的 ID。因此这是独立的开发安装，不会沿用旧 `wchecklist` 安装的启用状态或设置。请在 Obsidian 中启用对应插件；更新后禁用并重新启用，或重启 Obsidian。若旧安装也存在，验证时只启用一个。工具不会自动启用插件。
+点击 Obsidian Ribbon 的 WChecklist 图标，或运行 **WChecklist: 打开任务工作台**。
 
-### 同步到生产 Vault 验证
+在「项目」页中选择「网站改版」，点击任务查看详情。你可以设置负责人、修改日期并保存；桌面端还可用任务行的「更多操作」打开菜单。点击「打开原文」可查看对应笔记，移动端会在新的阅读标签中打开。
 
-在 `.user/dev_config.json` 的 `obsidianPluginsDirs_ProductiveEnv` 中填写生产 Vault 的插件根目录列表（字符串数组，示例见 `config/dev_config.example.json`）。
+桌面端在原文中编辑时，把光标放在任务首行，按 **Alt+M** 打开属性菜单。快捷键可在 Obsidian 热键设置中调整。
 
-```bash
-pnpm plugin:install:prod          # 普通构建后同步，默认不包含诊断日志
-pnpm plugin:install:prod:diagnostics # 显式诊断构建后同步，供临时排查
-pnpm plugin:sync:prod --dry-run   # 检查现有产物与全部目标，仅预览，不写入
-pnpm plugin:sync:prod             # 仅同步现有产物
-```
+## 日常使用
 
-生产命令只使用该列表，不回退到测试目录；写入前检查全部产物和目标类型。仅覆盖各目录下 `obsidian-wchecklist/` 内的 `main.js`、`manifest.json`、`styles.css`，保留 `data.json`、其他插件文件及笔记。生产副本的 manifest 与仓库产物保持一致（本地源码版本为 `0.0.0`，不会自动注入 Release tag）；要求插件 ID 与仓库目录名一致。Git linked worktree 使用 Git 元数据指向的主仓库目录名校验插件 ID，可直接从功能分支运行生产同步，不会使用 worktree 的临时目录名安装第二份插件；配置仍读取当前 worktree 的 `.user/dev_config.json`。更新后禁用并重新启用插件，或重启 Obsidian。同步多个目标时，实际磁盘写入失败可能造成部分目录已更新，排除故障后可重跑。
+### 用四个页面组织任务
 
-索引性能排查：先用 `pnpm plugin:install:prod:diagnostics` 安装并重载，再执行命令「WChecklist: 清空索引时间日志」，修改任务后执行「WChecklist: 导出索引时间日志 (JSON)」。报告保存在 `WChecklist-data/reports/index-timing-*.json`，schema 2，包含最近 300 条索引、300 条同步刷新和 600 条分阶段记录；只记录阶段、耗时、计数与会话内文件代号，不记录笔记正文、路径、属性值或异常消息，不自动上传。日志不等同于真实输入延迟。
+- **首页**：默认打开，汇总「下个里程碑」「紧急事项」「跟催事项」和「待办概览」，从摘要进入详情或查看全部。
+- **项目**：查看已注册清单里的任务，按工作/个人领域、项目、负责人和状态缩小范围。默认关注未完成任务，需要回顾时切换到「全部状态」。
+- **等待**：集中查看已委派等待的任务，配合负责人和跟进日期安排后续联系。
+- **收集箱**：先记下任务，再整理。请先把一篇笔记注册为「收集箱」，然后在此页的「快速收集」中选择写入目标，输入内容并点击「新增任务」。
 
-诊断构建默认输出 `[WChecklist:index]` / `[WChecklist:refresh]` / `[WChecklist:phase]`，包含 UTC 时间、耗时、阶段编号和 `diagnostic-<源码指纹>`。覆盖命令与写入保护、备份、索引解析/投影、工作台、Chip 延后绘制和切换 Markdown 的事件。命令「切换索引时间日志的控制台输出」可关闭实时输出而保留内存 JSON；重载后恢复开启。嵌套阶段不能直接相加，Console 本身可能影响测量。详细步骤见[索引计时宿主清单](doc/development/issue-3-index-timing-host-checklist.md)。
+工作台保留任务的原文层级，也支持切换显示方式。桌面端移动任务时，同文件内可拖动左侧手柄调整位置；跨文件移动从任务详情操作，完整子树会一起移动。
 
-索引解析使用内嵌的本地 Worker，降低重新索引期间对主线程的占用；线程不可用时自动使用同步解析。诊断版以 `parser.worker-start/result/fallback` 标明运行情况，并在宿主支持时记录 `host.long-task`。长任务涵盖整个宿主，不能直接归因于插件；`index.parse` 包含线程等待和消息传输，不能视为主线程阻塞时间。命令预览、安全保护和界面更新仍在主线程。
+### 在手机和平板上查看与修改
 
-编译标记 `__WCHECKLIST_DIAGNOSTICS__` 默认 false，仅 `pnpm build:diagnostics`（`--diagnostics`）设为 true。普通构建会剔除诊断记录器、Console 标记、诊断命令和事件订阅，不创建日志缓存。问题解决后运行普通 `pnpm plugin:install:prod` 并重载即可。该方式针对[官方检查清单](https://docs.obsidian.md/oo/plugin)中移除非必要生产测试日志的要求；不代表插件其余部分已完成官方审核。watch 模式的构建指纹取启动时源码，正式回传诊断前请使用单次诊断构建。
+移动端以工作台查看、详情阅读和属性修改为主：
 
-命令级属性修改基准可运行 `pnpm test:attribute-performance`，覆盖 100/400/800 Task 的完整预览、保护写入和最终索引发布，输出首轮及暖轮计时，并限制普通属性修改的整文件解析次数为 2。数据均为虚构，结果与完整重建比对；宿主磁盘、DOM 和真实输入延迟需另行实测。
+- 查看首页、项目与普通清单、等待和收集箱，使用搜索与筛选；窄屏筛选可以展开和收起。
+- 点击任务打开详情弹窗，阅读内容并修改优先级、日期、负责人、类别和状态，点击「保存」写回原笔记。说明条目（Note）与冲突条目保留只读保护。
+- 有未保存修改时，返回或取消会提示确认；保存期间阻止重复提交。原文变化导致草稿失效时，请重新打开详情核对后修改。
+- 阅读 Markdown 时直接显示原始 Emoji，不启用 Chip；不会覆盖桌面端保存的 Chip/Emoji 偏好。
 
-### 私有 fixture（真实清单回归）
+Markdown 文件的直接编辑、原文快捷菜单与自动补全不属于移动端开发范围。任务拖动、缩进与跨文件移动、首页布局管理和冲突修复请在桌面端完成；移动端可临时折叠首页部件，不修改已保存的布局。
 
-真实项目清单含敏感信息，**不入库、不进 CI、不进日志**。本地配置方式：
+已通过桌面 CLI 和移动模拟验证布局、详情与写回。真实 Android/iOS 的软键盘、中文输入法、系统返回/手势、旋转、前后台恢复及平板分屏仍待人工验收，模拟结果不能替代这些验证。
 
-1. 复制 `config/dev_config.example.json` 为 `.user/dev_config.json`（已被 gitignore）；
-2. `fixtures` 为文件路径数组，可指向 `.user/fixtures/` 的副本，或用户明确指定的绝对路径。相对路径以仓库根目录解析；加载器只读源文件，不复制或改写；
-3. 默认配置不存在时明确跳过；配置损坏、字段缺失或文件不可读时失败。可用 `WCHECKLIST_PRIVATE_CONFIG` 指定其他配置路径，显式指定却不存在也视为失败。错误信息不打印私有路径或正文。
+### 用菜单设置属性
 
-I00 的四个公开样例均为人工构造；其中全量样例为 40 checkbox（32 Task + 8 Note），不能代替真实 399/398/1 验收。样例清单见 `src/__tests__/fixtures/inventory.json`。其中边界样例的 `lexicalMarkers` 包含代码示例中的伪任务，不能作为解析任务数量。UTF-16 字符长度与 UTF-8 字节长度分别记录，Git 禁止转换 fixture 换行。
+桌面端无需手写全部标记，可以从以下入口编辑；移动端请从工作台打开详情：
 
-I01 另新增 `production-shape.md`：只读参考生产笔记，保留 Tab 层级、空白、标题和 399 个 marker 分布；正文、frontmatter 属性和链接值全部替换为虚构内容。它提供结构回归，不代表完整真实语义验收。公开测试及 `spike:source` 不读取私有配置；后者只接受公开 fixture 目录内的 Markdown，报告限于 `doc/development/reports/`。
-
-S2/S3 的实际宿主步骤见 [I01 操作清单](doc/development/I01-host-checklist.md)。专用插件名为 **WChecklist I01 Spike**，只能在本仓库的独立 Vault 中运行，不进入正式插件构建，也不使用生产插件安装配置。重复准备不会覆盖已经编辑的测试笔记。
-
-I02 默认报告为 `doc/development/reports/I02-source.json`。查看完整源树可执行 `pnpm inspect:source --input src/__tests__/fixtures/boundaries-crlf.md --report doc/development/reports/I02-detail.json --full`；只接受公开 fixture，报告限于公开报告目录。源标记数量不是业务 Task/Note 数量，完整字段契约及后续复验见 [I02 记录](doc/development/iterations/I02.md)。
-
-I03 新增虚构 Tab 语义样例 `I03-semantics.md`，公开 fixture 共六份。`pnpm poc:parse` 默认只读检查公开材料；`--mode registered` 仅输出 active 文件的实体，迁移预览不进入正常索引；`--full` 可用于公开完整报告。显式私有命令 `pnpm poc:parse --private --baseline .user/I03-baseline.json` 使用本地配置，报告仅为 `.user/reports/I03-private.json` 的匿名摘要，禁止完整正文输出和写入公开报告目录。
-
-真实工作笔记会继续变化：历史设计快照为 399/398/1；用户于 2026-10-23 确认新增待办，本轮固定快照为 **400 checkbox / 399 Task / 1 Note**。本地 baseline 绑定 SHA-256 与预期计数，内容变化时重新确认或使用隔离副本，不自动追随源文件改预期；公开结构样例仍保留 399。详见 [I03 记录](doc/development/iterations/I03.md)。
-
-I04 的 `TaskIndex` 提供只读查询、独立 TaskGroup 和版本检查；默认统计排除过期缓存，显式 `includeStale` 可查看旧数据。Waiting 包含 delegated，Note 不进入未完成数；跨文件 Node ID 冲突撤下继承并保留诊断。`pnpm bench:index` 默认用完全虚构的两组 500 Task＋10 Note 数据，报告为 `doc/development/reports/I04-index.json`；`--input` 可附加公开 fixture，`--report` 可指定公开报告路径。Node 初测不代替 I12 的宿主 UI 验收；API、版本规则与证据见 [I04 记录](doc/development/iterations/I04.md)。
-
-## 开发阶段
-
-| 阶段 | 内容 |
+| 你正在做什么 | 编辑入口 |
 | --- | --- |
-| Spike | 解析器无损性、HTML 注释渲染、processFrontMatter、Entra 授权、Graph 时区 |
-| 批次 A | 离线核心：Registry → Parser（POC-01）→ Index → Command/Mutation（POC-02） |
-| 批次 B | Obsidian 集成：工作台 → 迁移向导（L0–L2）→ Chip；完成后为第一个可用版本（无日历） |
-| 批次 C | Schedule 编辑 + Graph 单向同步（L3）；第二个版本 |
+| 在笔记里写任务 | 光标放在任务首行，按 **Alt+M**（「编辑当前条目」） |
+| 想一次修改多项内容 | 运行 **WChecklist: 编辑任务详情**，或在工作台点击任务打开详情，修改后保存 |
+| 已经看到属性标签 | 点击 Chip，打开对应属性菜单 |
+| 想在输入时快速补充属性 | 在设置中启用「行尾空格打开快捷菜单」，在任务首行末单独输入空格 |
 
-详见开发计划文档。
+菜单支持优先级、截止日期、开始日期、计划日期、跟进日期、负责人、类别和状态。常用指派人可在「设置 → WChecklist」中维护，菜单也会提供最近成功指派的人员。
+
+使用中文输入法时，先完成选词，再单独输入空格触发菜单；按 `↓` 进入选择，继续输入会关闭菜单。
+
+### 在原文中识别任务和属性
+
+| 写法 | 含义 |
+| --- | --- |
+| `- [ ] 任务` | 未完成 / 待处理 |
+| `- [>] 任务` | 已委派等待 |
+| `- [x] 任务` | 已完成 |
+| `- [-] 任务` | 已取消 |
+| `- [n] 说明` | Note，保留说明但不作为待办计数 |
+| `📅 2026-11-06` | 截止日期 |
+| `🛫 2026-11-01` | 开始日期 |
+| `⏳ 2026-11-02` | 计划日期 |
+| `📞 2026-11-03` | 跟进日期 |
+| `🙋 小林` | 负责人 |
+| `🏷️ 设计` | 类别 |
+
+属性写在任务首行，日期使用 `YYYY-MM-DD`。这些日期用于任务管理，目前不会创建日历事件或触发提醒。Note 可通过菜单明确转换为任务。
+
+桌面端默认的 **Chip** 显示会把属性呈现为可点击标签；光标进入属性区域时可编辑原文。偏好原始标记时，在「设置 → WChecklist → 属性显示方式」选择 **Emoji**，保存后禁用再启用插件生效。Source Mode 始终保留完整 Markdown。移动端固定使用 Emoji 阅读，保留桌面端偏好。
+
+### 选择适合的清单类型
+
+注册信息保存在笔记的 Properties 中，不依赖文件名或所在文件夹。推荐通过注册命令配置；需要手工检查时，可参考：
+
+```yaml
+---
+wchecklist-type: project-list
+wchecklist-scope: work
+project: 网站改版
+---
+```
+
+| 清单类型 | `wchecklist-type` | 用途 |
+| --- | --- | --- |
+| 普通清单 | `general-list` | 管理日常事项，项目可选 |
+| 项目清单 | `project-list` | 按项目组织任务，注册时填写项目名称 |
+| 收集箱 | `inbox` | 接收快速收集的任务 |
+| 里程碑清单 | `milestone-list` | 定义项目里程碑，需填写项目名称 |
+
+领域 `wchecklist-scope` 使用 `work`（工作）或 `personal`（个人）。同一个项目可以有多篇清单笔记，使用一致的领域和项目名称即可聚合查看。
+
+### 项目里程碑（Beta）
+
+运行 **WChecklist: 打开项目里程碑清单**，或使用工作台项目行的 🎯 入口，打开项目对应的清单笔记。里程碑定义与改名、移动、删除目前在桌面端源文件中维护；旧的里程碑管理对话框已退役。任务可通过桌面端属性菜单选择里程碑，首行使用 `🎯 里程碑名称` 记录关联。
+
+工作台支持按里程碑筛选和分组；首页的「下个里程碑」部件展示各项目下一个带日期的未完成里程碑及关联任务进度。没有日期的里程碑不会占据「下个里程碑」。旧的独立里程碑 Dashboard 及其打开命令已退役。
+
+里程碑功能仍在测试中，部分编辑模式、跨文件引用和多面板场景尚未完成全部实际验证，使用时请留意版本说明。
+
+## 常见问题
+
+### 为什么工作台里没有我的任务？
+
+先确认笔记已通过「注册此文件到 WChecklist」完成注册。插件不会自动纳管普通笔记，也不会根据文件夹或文件名推断项目。
+
+如果已经注册，先清除工作台筛选，并切换到「全部状态」。仍未出现时，打开右上角菜单中的「文件注册」检查注册状态，再查看「诊断」提示；修正 Properties 或正文问题后点击「刷新」。
+
+### 为什么某次修改被拒绝了？
+
+当原文已变化、多个编辑面板内容不一致，或任务标识、属性存在冲突时，插件可能拒绝写入。先核查原文和诊断，处理后重新打开菜单或详情。
+
+如果提示保存结果未知或需要恢复，请保留相关笔记和备份，核对实际内容后再操作，避免直接重复提交。
+
+### 为什么阅读视图里有些属性没有变成 Chip？
+
+移动端固定显示 Emoji，不显示 Chip。桌面端 Reading 模式对富文本、重复首行、内嵌等内容可能无法可靠定位，此时会保留原生文本。可以回到原笔记编辑，或使用任务菜单；无需为了显示效果改写正文。
+
+### 能在手机上使用，或者同步到 Outlook 吗？
+
+移动端已加入工作台浏览、详情阅读与属性/状态修改，使用范围及待验项目见上文「在手机和平板上查看与修改」。目前主要在 Windows 宿主与移动模拟中验证，Android/iOS 真机、其他桌面平台及 Obsidian 历史版本未逐一验证。详细日历排期、提醒和 Outlook 双向同步属于后续计划，当前版本尚未提供。
+
+### 禁用或卸载后，任务还在吗？
+
+任务保存在 Markdown 笔记中。禁用或卸载后，复选框、属性标记、层级、链接和 Block ID 仍会保留；文件 Properties 也会保留。Chip 显示会恢复为原生文本。
+
+## 更新与备份
+
+更新前建议备份以下三类数据：
+
+| 需要保留的位置 | 内容 |
+| --- | --- |
+| 你的 Markdown 笔记及目录结构 | 任务、说明、层级、属性、链接与 ID |
+| Vault 根目录 `WChecklist-data/` | 独立记录、恢复日志、备份和报告 |
+| `.obsidian/plugins/obsidian-wchecklist/data.json` | 显示方式、菜单开关、常用/最近指派人等偏好 |
+
+手动升级时，禁用插件，只替换同一版本的 `main.js`、`manifest.json`、`styles.css`，保留 `data.json`，再重新启用。不要通过删除整个插件目录来升级。
+
+任务索引会在启动或工作台「刷新」时从笔记重新构建；`WChecklist-data/` 中的独立记录与恢复证据不能当作缓存删除。单独复制一篇 Markdown 不等于完整备份。
+
+## 反馈与版本记录
+
+遇到问题或有功能建议，欢迎到[公开仓库 Issues](https://github.com/DH3650/obsidian-wchecklist-release/issues)反馈。请提供插件版本、Obsidian 版本、操作系统、复现步骤，以及预期和实际结果；示例笔记请使用虚构或脱敏内容。
+
+需要进一步排查时，可运行 **WChecklist: 导出宿主验证报告 (JSON)**，报告保存在 `WChecklist-data/reports/`。分享前请检查并脱敏，报告可能包含笔记路径和诊断信息。
+
+每个版本的新增功能、修正和限制见 [CHANGELOG.md](CHANGELOG.md)，安装文件见[公开发布页](https://github.com/DH3650/obsidian-wchecklist-release/releases)。
